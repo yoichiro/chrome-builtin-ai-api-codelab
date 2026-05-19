@@ -1,11 +1,14 @@
 // =============================================================================
-// Chrome Built-in AI API Codelab - メインスクリプト
+// Chrome Built-in AI API Codelab - メインスクリプト (スターター)
 // -----------------------------------------------------------------------------
 // このファイルでは、Chrome の組み込み AI API を 4 つ使用します:
 //   - Summarizer API       : テキストの要約 (要点抽出)
 //   - Language Detector API: 入力テキストの言語判定
 //   - Translator API       : 言語間の翻訳 (今回は英語 → 日本語)
 //   - Prompt API           : 汎用の対話 (LanguageModel)
+//
+// このスターターでは AI API を呼び出している箇所がすべて TODO コメントに
+// なっています。コメントの指示に従ってコードを埋めていきましょう。
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -94,26 +97,22 @@ const withLoading = async (button, loadingLabel, fn) => {
 const initializeInstances = async () => {
   [summarizer, languageDetector, translatorEnJa, languageModel] =
     await Promise.all([
-      // Summarizer: type を "key-points" にして要点抽出モードに。
-      // 入出力ともに日本語を明示することで日本語の要約品質を高める。
-      Summarizer.create({
-        type: "key-points",
-        expectedInputLanguages: ["ja"],
-        outputLanguage: "ja",
-        monitor: makeMonitor(0),
-      }),
-      // Language Detector: 入力言語を自動判定する。オプションは不要。
-      LanguageDetector.create({ monitor: makeMonitor(1) }),
-      // Translator: 言語ペア (sourceLanguage / targetLanguage) は必須。
-      // 今回は受信メッセージの英語 → 日本語翻訳のみ対応。
-      Translator.create({
-        sourceLanguage: "en",
-        targetLanguage: "ja",
-        monitor: makeMonitor(2),
-      }),
-      // LanguageModel (Prompt API): 汎用の対話モデル。
-      // デフォルト設定で生成し、`prompt()` メソッドで自由なプロンプトを送る。
-      LanguageModel.create({ monitor: makeMonitor(3) }),
+      // TODO: Summarizer.create() を呼び出して Summarizer インスタンスを生成してください。
+      //   - type: "key-points" (要点抽出モード)
+      //   - expectedInputLanguages: ["ja"]
+      //   - outputLanguage: "ja"
+      //   - monitor: makeMonitor(0)
+      // TODO: LanguageDetector.create() を呼び出して Language Detector インスタンスを
+      //       生成してください。
+      //   - monitor: makeMonitor(1)
+      // TODO: Translator.create() を呼び出して 英語 → 日本語の Translator インスタンスを
+      //       生成してください。
+      //   - sourceLanguage: "en"
+      //   - targetLanguage: "ja"
+      //   - monitor: makeMonitor(2)
+      // TODO: LanguageModel.create() を呼び出して LanguageModel インスタンスを
+      //       生成してください。
+      //   - monitor: makeMonitor(3)
     ]);
 };
 
@@ -161,8 +160,8 @@ ${inputMessage.value}`
 メッセージ:
 ${inputMessage.value}`;
 
-    // LanguageModel.prompt() は文字列を返す Promise。
-    businessMessage.value = await languageModel.prompt(prompt);
+    // TODO: languageModel.prompt(prompt) を呼び出して、結果を businessMessage.value に
+    //       代入してください。prompt() は文字列を返す Promise です。
   }),
 );
 
@@ -186,16 +185,12 @@ analyzeButton.addEventListener("click", () =>
     // 要約用のテキスト。英語だった場合は翻訳後に置き換える。
     let text = received;
 
-    // languageDetector.detect() は信頼度順にソートされた配列を返す。
-    //   例: [{ detectedLanguage: 'en', confidence: 0.98 }, ...]
-    // 分割代入で先頭 (最も確からしい候補) だけを取り出す。
-    const [topResult] = await languageDetector.detect(text);
-    if (topResult.detectedLanguage === "en") {
-      // 英語と判定されたら、要約前に日本語へ翻訳する。
-      // Summarizer を expectedInputLanguages: ['ja'] で作成しているため、
-      // 日本語に揃えてから渡したほうが品質が安定する。
-      text = await translatorEnJa.translate(text);
-    }
+    // TODO: languageDetector.detect(text) を呼び出して、戻り値の配列から
+    //       先頭 (最も信頼度の高い候補) を分割代入で topResult に取り出してください。
+    //       戻り値の形式: [{ detectedLanguage: 'en', confidence: 0.98 }, ...]
+
+    // TODO: topResult.detectedLanguage が "en" のとき、
+    //       translatorEnJa.translate(text) で日本語に翻訳し、text に代入してください。
 
     // 感情解析用のプロンプト。
     //   - 「絵文字一文字だけ」と厳密に指示
@@ -210,16 +205,11 @@ analyzeButton.addEventListener("click", () =>
 メッセージ:
 ${received}`;
 
-    // 要約と感情判定は独立した処理なので Promise.all で並列実行する。
-    // 別の API インスタンスを使っているので競合は起きない。
-    const [summary, emotion] = await Promise.all([
-      summarizer.summarize(text),
-      languageModel.prompt(emotionPrompt),
-    ]);
-
-    summaryResult.value = summary;
-    // モデルが万一前後に空白を含めても困らないよう trim() で除去。
-    emotionResult.textContent = emotion.trim();
+    // TODO: summarizer.summarize(text) と languageModel.prompt(emotionPrompt) を
+    //       Promise.all で並列実行し、結果を summary と emotion に分割代入してください。
+    //       取得後は以下のように画面に反映します:
+    //         summaryResult.value = summary;
+    //         emotionResult.textContent = emotion.trim();
   }),
 );
 
@@ -242,15 +232,14 @@ ${received}`;
   //
   // `create()` 時のオプションによって availability が変わる API もあるため、
   // ここでも create() と同じオプションで揃えてチェックする。
-  const availabilities = await Promise.all([
-    Summarizer.availability({
-      expectedInputLanguages: ["ja"],
-      outputLanguage: "ja",
-    }),
-    LanguageDetector.availability(),
-    Translator.availability({ sourceLanguage: "en", targetLanguage: "ja" }),
-    LanguageModel.availability(),
-  ]);
+
+  // TODO: 4 つの API の availability() を Promise.all で並列にチェックし、
+  //       結果を availabilities に代入してください。
+  //   - Summarizer.availability({ expectedInputLanguages: ["ja"], outputLanguage: "ja" })
+  //   - LanguageDetector.availability()
+  //   - Translator.availability({ sourceLanguage: "en", targetLanguage: "ja" })
+  //   - LanguageModel.availability()
+  const availabilities = [];
 
   // 全部 'available' なら、ユーザー操作なしで即インスタンス化できる。
   const allAvailable = availabilities.every((a) => a === "available");
