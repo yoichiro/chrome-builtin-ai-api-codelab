@@ -1,21 +1,21 @@
 // =============================================================================
-// Chrome Built-in AI API Codelab - メインスクリプト (スターター)
+// Chrome Built-in AI API Codelab - Main script (starter)
 // -----------------------------------------------------------------------------
-// このファイルでは、Chrome の組み込み AI API を 4 つ使用します:
-//   - Summarizer API       : テキストの要約 (要点抽出)
-//   - Language Detector API: 入力テキストの言語判定
-//   - Translator API       : 言語間の翻訳 (今回は英語 → 日本語)
-//   - Prompt API           : 汎用の対話 (LanguageModel)
+// This file uses four of Chrome's built-in AI APIs:
+//   - Summarizer API       : Summarizes text (key-point extraction)
+//   - Language Detector API: Detects the language of the input text
+//   - Translator API       : Translates between languages (Japanese -> English here)
+//   - Prompt API           : General-purpose conversation (LanguageModel)
 //
-// このスターターでは AI API を呼び出している箇所がすべて TODO コメントに
-// なっています。コメントの指示に従ってコードを埋めていきましょう。
+// In this starter, every spot that calls an AI API is left as a TODO comment.
+// Follow the instructions in the comments to fill in the code.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// DOM 要素の取得
+// Obtain references to DOM elements
 // -----------------------------------------------------------------------------
-// ページ内で操作する要素を最初にまとめて取得しておく。
-// `<script defer>` で読み込んでいるため、この時点で DOM は構築済み。
+// Grab every element we will manipulate up front. The script is loaded with
+// `<script defer>`, so the DOM is already built at this point.
 const startButton = document.getElementById("start-button");
 const downloadingMessage = document.getElementById("downloading-message");
 const downloadProgress = document.getElementById("download-progress");
@@ -29,35 +29,38 @@ const summaryResult = document.getElementById("summary-result");
 const emotionResult = document.getElementById("emotion-result");
 
 // -----------------------------------------------------------------------------
-// AI API インスタンスの保持変数
+// Variables that hold AI API instances
 // -----------------------------------------------------------------------------
-// `create()` で生成した各 API のインスタンスを、ボタンハンドラから参照できるよう
-// モジュールスコープに保持する。初期化前は `undefined`。
-let summarizer; // Summarizer API のインスタンス
-let languageDetector; // Language Detector API のインスタンス
-let translatorEnJa; // Translator API のインスタンス (英語 → 日本語)
-let languageModel; // Prompt API (LanguageModel) のインスタンス
+// Each instance created by `create()` is stored at module scope so that any
+// button handler can reach it. Before initialization the values are `undefined`.
+let summarizer; // Summarizer API instance
+let languageDetector; // Language Detector API instance
+let translatorJaEn; // Translator API instance (Japanese -> English)
+let languageModel; // Prompt API (LanguageModel) instance
 
 // -----------------------------------------------------------------------------
-// ダウンロード進捗の管理
+// Download progress tracking
 // -----------------------------------------------------------------------------
-// 4 つの API はそれぞれモデルファイルをダウンロードする。
-// 各 API ごとの進捗 (0 〜 1 の範囲) を配列で保持し、平均値を画面に表示する。
+// Each of the four APIs downloads its own model file. We keep the progress
+// (a number in the range 0..1) for each API in an array and show the average
+// value on screen.
 const progresses = [0, 0, 0, 0];
 
-// 4 つの進捗の平均をパーセント (0 〜 100) に変換して画面に反映する関数。
+// Convert the average of the four progress values to a percentage (0..100)
+// and reflect it on screen.
 const updateProgress = () => {
   const average = progresses.reduce((sum, p) => sum + p, 0) / progresses.length;
   downloadProgress.textContent = (average * 100).toFixed(0);
 };
 
-// `monitor` コールバック用のファクトリ関数。
-// 各 API の `create()` に渡す関数を index 付きで生成することで、
-// どの API の進捗イベントなのかを区別して progresses 配列に書き込める。
+// Factory function for the `monitor` callback.
+// Generating the callback passed to each `create()` with an index lets us tell
+// which API the progress event came from, so we can write the value to the
+// right slot of the `progresses` array.
 //
-// 使い方:
+// Usage:
 //   Summarizer.create({ monitor: makeMonitor(0) });
-//   → m.addEventListener('downloadprogress', e => progresses[0] = e.loaded)
+//   -> m.addEventListener('downloadprogress', e => progresses[0] = e.loaded)
 const makeMonitor = (index) => (m) => {
   m.addEventListener("downloadprogress", (e) => {
     progresses[index] = e.loaded;
@@ -66,14 +69,16 @@ const makeMonitor = (index) => (m) => {
 };
 
 // -----------------------------------------------------------------------------
-// ボタンのローディング状態を制御するヘルパー
+// Helper to control a button's loading state
 // -----------------------------------------------------------------------------
-// 非同期処理の前後でボタンを「処理中」状態に切り替えるための共通ロジック。
-//   - 開始時: disabled = true にして二重クリックを防止、ラベルを変更
-//   - 終了時: 元の状態に戻す (例外が発生しても finally で必ず復帰)
+// Shared logic for switching a button into a "working" state around an async
+// operation:
+//   - On start: set disabled = true to block double-clicks, change the label.
+//   - On end  : restore the original state (the finally block runs even if an
+//               exception is thrown, so the button is always restored).
 //
-// CSS 側で `button:disabled::after` にスピナーアニメーションを定義しているため、
-// disabled になると自動的にスピナーが回る仕組み。
+// In the CSS we define a spinner animation on `button:disabled::after`, so the
+// spinner spins automatically whenever the button becomes disabled.
 const withLoading = async (button, loadingLabel, fn) => {
   const original = button.textContent;
   button.disabled = true;
@@ -87,41 +92,42 @@ const withLoading = async (button, loadingLabel, fn) => {
 };
 
 // -----------------------------------------------------------------------------
-// 4 つの AI API インスタンスをまとめて初期化
+// Initialize all four AI API instances together
 // -----------------------------------------------------------------------------
-// `Promise.all` で 4 つを並列にダウンロード / 生成する。
-// それぞれ未ダウンロード状態なら自動的にダウンロードが開始される。
+// `Promise.all` downloads / creates all four in parallel. Any model that has
+// not been downloaded yet will start downloading automatically.
 //
-// 注意: モデル未ダウンロード時に `create()` を呼ぶ場合、ユーザー操作
-// (クリックなど) を起点にしないと NotAllowedError が発生する。
+// Note: when calling `create()` while the model is not yet downloaded, a user
+// gesture (click, etc.) must be the entry point, or a NotAllowedError is
+// thrown.
 const initializeInstances = async () => {
-  [summarizer, languageDetector, translatorEnJa, languageModel] =
+  [summarizer, languageDetector, translatorJaEn, languageModel] =
     await Promise.all([
-      // TODO: Summarizer.create() を呼び出して Summarizer インスタンスを生成してください。
-      //   - type: "key-points" (要点抽出モード)
-      //   - expectedInputLanguages: ["ja"]
-      //   - outputLanguage: "ja"
+      // TODO: Call Summarizer.create() to create the Summarizer instance.
+      //   - type: "key-points" (key-point extraction mode)
+      //   - expectedInputLanguages: ["en"]
+      //   - outputLanguage: "en"
       //   - monitor: makeMonitor(0)
-      // TODO: LanguageDetector.create() を呼び出して Language Detector インスタンスを
-      //       生成してください。
+      // TODO: Call LanguageDetector.create() to create the Language Detector
+      //       instance.
       //   - monitor: makeMonitor(1)
-      // TODO: Translator.create() を呼び出して 英語 → 日本語の Translator インスタンスを
-      //       生成してください。
-      //   - sourceLanguage: "en"
-      //   - targetLanguage: "ja"
+      // TODO: Call Translator.create() to create a Japanese -> English
+      //       Translator instance.
+      //   - sourceLanguage: "ja"
+      //   - targetLanguage: "en"
       //   - monitor: makeMonitor(2)
-      // TODO: LanguageModel.create() を呼び出して LanguageModel インスタンスを
-      //       生成してください。
+      // TODO: Call LanguageModel.create() to create the LanguageModel
+      //       instance.
       //   - monitor: makeMonitor(3)
     ]);
 };
 
 // -----------------------------------------------------------------------------
-// 「AIモデルの準備を開始」ボタン: クリックでモデルのダウンロードを開始
+// "Start preparing AI models" button: click to begin downloading the models
 // -----------------------------------------------------------------------------
-// 後述の availability チェックで、モデルが未ダウンロードだった場合のみ
-// このボタンが表示される。クリックがユーザー操作の起点となり、
-// Chrome の AI API がモデルダウンロードを許可するようになる。
+// This button appears only when the availability check below determines that
+// the models are not yet downloaded. The click is the user gesture that
+// authorizes Chrome's AI APIs to start downloading the models.
 startButton.addEventListener("click", async () => {
   startButton.hidden = true;
   downloadingMessage.hidden = false;
@@ -131,125 +137,137 @@ startButton.addEventListener("click", async () => {
 });
 
 // -----------------------------------------------------------------------------
-// 「ビジネス文書化」ボタン: Prompt API で送信メッセージを整形
+// "Format as business writing" button: use the Prompt API to refine the text
 // -----------------------------------------------------------------------------
-// 受信メッセージ (outputMessage) が入力されている場合は「返信」として
-// 文脈を踏まえた整形を行い、未入力の場合は単独でビジネス文書化する。
+// If a received message (outputMessage) is present, the rewrite is performed
+// as a "reply" that respects the context. Otherwise the message is formatted
+// on its own.
 formatButton.addEventListener("click", () =>
-  withLoading(formatButton, "変換中", async () => {
-    // 直前の結果を即座にクリア (古い表示が残らないようにする)
+  withLoading(formatButton, "Converting", async () => {
+    // Clear any previous result immediately so stale output is not displayed.
     businessMessage.value = "";
 
     const receivedText = outputMessage.value.trim();
 
-    // 受信メッセージの有無でプロンプトを切り替える。
-    //   - あり: 返信モード (受信メッセージを文脈として渡す)
-    //   - なし: 単独モード (送信メッセージのみを整形)
-    // 「書き直した文面のみを出力」と明示することで、
-    // モデルが余計な前置きや説明を付けないようにしている。
+    // Switch prompts depending on whether a received message exists.
+    //   - Present: reply mode (passes the received message as context).
+    //   - Absent : standalone mode (formats just the outgoing message).
+    // The phrase "output only the rewritten text" instructs the model not to
+    // add any preamble or explanation.
     const prompt = receivedText
-      ? `以下に示す「受信メッセージ」に対する返信として、「返信メッセージ」をビジネス文書としてふさわしい丁寧な日本語の文面に書き直してください。書き直した返信文のみを出力し、説明や前置きは不要です。
+      ? `Rewrite the following "reply message" as a polite, business-appropriate response in English to the "received message" below. Output only the rewritten reply; no preamble or explanation is needed.
 
-受信メッセージ:
+Received message:
 ${receivedText}
 
-返信メッセージ:
+Reply message:
 ${inputMessage.value}`
-      : `次のメッセージを、ビジネス文書としてふさわしい丁寧な日本語の文面に書き直してください。書き直した文面のみを出力し、説明や前置きは不要です。
+      : `Rewrite the following message as a polite, business-appropriate text in English. Output only the rewritten text; no preamble or explanation is needed.
 
-メッセージ:
+Message:
 ${inputMessage.value}`;
 
-    // TODO: languageModel.prompt(prompt) を呼び出して、結果を businessMessage.value に
-    //       代入してください。prompt() は文字列を返す Promise です。
+    // TODO: Call languageModel.prompt(prompt) and assign the result to
+    //       businessMessage.value. prompt() returns a Promise that resolves
+    //       to a string.
   }),
 );
 
 // -----------------------------------------------------------------------------
-// 「解析する」ボタン: 受信メッセージを段階的に解析
+// "Analyze" button: analyze the received message step by step
 // -----------------------------------------------------------------------------
-// 処理の流れ:
-//   1. Language Detector で言語を判定
-//   2. 英語と判定されたら Translator で日本語に翻訳
-//   3. 要約 (Summarizer) と 感情判定 (Prompt API) を並列実行
+// Processing flow:
+//   1. Detect the language with the Language Detector.
+//   2. If the message is detected as Japanese, translate it to English with
+//      the Translator.
+//   3. Run summarization (Summarizer) and emotion detection (Prompt API) in
+//      parallel.
 analyzeButton.addEventListener("click", () =>
-  withLoading(analyzeButton, "解析中", async () => {
-    // 直前の結果をクリア
+  withLoading(analyzeButton, "Analyzing", async () => {
+    // Clear the previous results.
     summaryResult.value = "";
     emotionResult.textContent = "";
 
-    // 元の受信メッセージ。感情解析は原文のニュアンスを保つため
-    // 翻訳前のこの値を使う。
+    // Original received message. Emotion analysis keeps the nuance of the
+    // original wording, so we feed it the pre-translation value.
     const received = outputMessage.value;
 
-    // 要約用のテキスト。英語だった場合は翻訳後に置き換える。
+    // Text used for summarization. If the original was Japanese we replace it
+    // with the translated version.
     let text = received;
 
-    // TODO: languageDetector.detect(text) を呼び出して、戻り値の配列から
-    //       先頭 (最も信頼度の高い候補) を分割代入で topResult に取り出してください。
-    //       戻り値の形式: [{ detectedLanguage: 'en', confidence: 0.98 }, ...]
+    // TODO: Call languageDetector.detect(text) and destructure the first
+    //       element (the most confident candidate) of the returned array
+    //       into topResult.
+    //       Return shape: [{ detectedLanguage: 'ja', confidence: 0.98 }, ...]
 
-    // TODO: topResult.detectedLanguage が "en" のとき、
-    //       translatorEnJa.translate(text) で日本語に翻訳し、text に代入してください。
+    // TODO: When topResult.detectedLanguage is "ja", translate the text to
+    //       English with translatorJaEn.translate(text) and assign the
+    //       result back to text.
 
-    // 感情解析用のプロンプト。
-    //   - 「絵文字一文字だけ」と厳密に指示
-    //   - 例 (few-shot) を提示して出力イメージを伝える
-    //   - 「説明や記号、空白、改行は含めない」で余計な文字を抑制
-    const emotionPrompt = `以下のメッセージから読み取れる送信者の感情を、絵文字一文字だけで表現してください。
+    // Prompt for emotion detection.
+    //   - Insists strictly on "a single emoji character".
+    //   - Provides few-shot examples to convey the expected output shape.
+    //   - "Do not include any explanation, symbols, whitespace, or newlines"
+    //     suppresses extra characters.
+    const emotionPrompt = `From the message below, express the sender's emotion using a single emoji character only.
 
-例: 😊 / 😢 / 😡 / 😴 / 😐 / 🤔 / 😍 / 😨
+Examples: 😊 / 😢 / 😡 / 😴 / 😐 / 🤔 / 😍 / 😨
 
-絵文字のみを出力し、説明や記号、空白、改行は一切含めないでください。
+Output only the emoji. Do not include any explanation, symbols, whitespace, or newlines.
 
-メッセージ:
+Message:
 ${received}`;
 
-    // TODO: summarizer.summarize(text) と languageModel.prompt(emotionPrompt) を
-    //       Promise.all で並列実行し、結果を summary と emotion に分割代入してください。
-    //       取得後は以下のように画面に反映します:
+    // TODO: Run summarizer.summarize(text) and
+    //       languageModel.prompt(emotionPrompt) in parallel with Promise.all
+    //       and destructure the results into summary and emotion. After
+    //       that, reflect them on the screen like this:
     //         summaryResult.value = summary;
     //         emotionResult.textContent = emotion.trim();
   }),
 );
 
 // -----------------------------------------------------------------------------
-// ページ読み込み時の初期化処理 (IIFE)
+// Initialization on page load (IIFE)
 // -----------------------------------------------------------------------------
-// 即時実行関数 (Immediately Invoked Function Expression) で起動処理を実行。
-// クラシックスクリプトではトップレベル await が使えないためこの形にしている。
+// We run the startup logic inside an Immediately Invoked Function Expression
+// because top-level await is unavailable in classic scripts.
 //
-// 処理の流れ:
-//   1. 4 つの API の availability を並列にチェック
-//   2. 全部 'available' (ダウンロード済み) ならインスタンスを生成して即メイン表示
-//   3. ひとつでも未ダウンロードがあれば「開始」ボタンを表示し、ユーザー操作を待つ
+// Processing flow:
+//   1. Check availability for all four APIs in parallel.
+//   2. If everything is 'available' (already downloaded), create the instances
+//      and show the main UI immediately.
+//   3. If at least one model is not downloaded, show the "Start" button and
+//      wait for a user gesture.
 (async () => {
-  // availability() は以下のいずれかを返す:
-  //   'unavailable'  : この環境では利用不可
-  //   'downloadable' : 利用可能だが未ダウンロード (要ユーザー操作)
-  //   'downloading'  : 現在ダウンロード中
-  //   'available'    : すぐに使える状態
+  // availability() returns one of:
+  //   'unavailable'  : not usable in this environment
+  //   'downloadable' : usable but not downloaded (requires user gesture)
+  //   'downloading'  : currently downloading
+  //   'available'    : ready to use immediately
   //
-  // `create()` 時のオプションによって availability が変わる API もあるため、
-  // ここでも create() と同じオプションで揃えてチェックする。
+  // For some APIs the availability depends on the options that would be
+  // passed to create(), so we mirror the same options here.
 
-  // TODO: 4 つの API の availability() を Promise.all で並列にチェックし、
-  //       結果を availabilities に代入してください。
-  //   - Summarizer.availability({ expectedInputLanguages: ["ja"], outputLanguage: "ja" })
+  // TODO: Check availability() for all four APIs in parallel with
+  //       Promise.all and assign the result to availabilities.
+  //   - Summarizer.availability({ expectedInputLanguages: ["en"], outputLanguage: "en" })
   //   - LanguageDetector.availability()
-  //   - Translator.availability({ sourceLanguage: "en", targetLanguage: "ja" })
+  //   - Translator.availability({ sourceLanguage: "ja", targetLanguage: "en" })
   //   - LanguageModel.availability()
   const availabilities = [];
 
-  // 全部 'available' なら、ユーザー操作なしで即インスタンス化できる。
+  // If every API is 'available', we can instantiate without a user gesture.
   const allAvailable = availabilities.every((a) => a === "available");
 
   if (allAvailable) {
-    // モデル準備済み: 透過的にインスタンス生成してメイン画面へ
+    // Models are ready: instantiate transparently and reveal the main UI.
     await initializeInstances();
     mainContent.hidden = false;
   } else {
-    // 未ダウンロードあり: 「開始」ボタンを表示してユーザー操作を待つ
+    // At least one model is not downloaded: show the "Start" button and wait
+    // for the user gesture.
     startButton.hidden = false;
   }
 })();
