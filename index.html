@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>Chrome Built-in AI API Codelab</title>
@@ -12,38 +12,38 @@
     </header>
     <main class="page-main">
       <button id="start-button" type="button" hidden>
-        AIモデルの準備を開始
+        Start preparing AI models
       </button>
       <div id="downloading-message" hidden>
-        モデルのダウンロード中: <span id="download-progress">0</span>%
+        Downloading models: <span id="download-progress">0</span>%
       </div>
       <div id="main-content" hidden>
         <div class="columns">
           <section class="panel">
-            <h2 class="panel-title">受信メッセージの解析</h2>
+            <h2 class="panel-title">Analyze incoming message</h2>
             <div class="field">
-              <label for="output-message">受信したメッセージ</label>
+              <label for="output-message">Received message</label>
               <textarea id="output-message"></textarea>
             </div>
-            <button id="analyze-button" type="button">解析する</button>
+            <button id="analyze-button" type="button">Analyze</button>
             <div class="field">
-              <label for="summary-result">要点</label>
+              <label for="summary-result">Key points</label>
               <textarea id="summary-result" readonly></textarea>
             </div>
             <div class="field">
-              <label>送信者の感情</label>
+              <label>Sender's emotion</label>
               <div id="emotion-result" class="emotion-display"></div>
             </div>
           </section>
           <section class="panel">
-            <h2 class="panel-title">返信メッセージの作成</h2>
+            <h2 class="panel-title">Compose reply message</h2>
             <div class="field">
-              <label for="input-message">送信するメッセージ</label>
+              <label for="input-message">Message to send</label>
               <textarea id="input-message"></textarea>
             </div>
-            <button id="format-button" type="button">ビジネス文書化</button>
+            <button id="format-button" type="button">Format as business writing</button>
             <div class="field field--grow">
-              <label for="business-message">ビジネス文書としての文面</label>
+              <label for="business-message">Business-style version</label>
               <textarea id="business-message" readonly></textarea>
             </div>
           </section>
